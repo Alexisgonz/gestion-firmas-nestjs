@@ -3,7 +3,6 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { MondayModule } from './monday/monday.module';
 import { HttpModule } from '@nestjs/axios';
-import { DocusealModule } from './docu-seal/docu-seal.module';
 import { DocumentModule } from './document/document.module';
 
 @Module({
@@ -11,9 +10,11 @@ import { DocumentModule } from './document/document.module';
     HttpModule.register({
       timeout: 5000,
       maxRedirects: 5,
+      httpsAgent: new (require('https')).Agent({
+        rejectUnauthorized: false
+      }),
     }),
     MondayModule,
-    DocusealModule,
     DocumentModule,
   ],
   controllers: [AppController],

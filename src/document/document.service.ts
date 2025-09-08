@@ -1,28 +1,34 @@
-import { Injectable } from '@nestjs/common';
-import { HttpService } from '@nestjs/axios';
+import { Injectable, Logger } from '@nestjs/common';
+import { MondayService } from '../monday/monday.service';
 
 @Injectable()
 export class DocumentsService {
-  constructor(private readonly http: HttpService) {}
+  private readonly logger = new Logger(DocumentsService.name);
+  constructor(private readonly monday: MondayService) {}
 
-  // Aquí decides cómo resolver el ID -> URL real del PDF.
-  // Ejemplos:
-  // - Si "id" es el itemId de Monday, llama a MondayService para obtener el asset.
-  // - Si "id" es directamente un assetId/URL, resuélvelo y bájalo.
-  async fetchPdfBufferById(id: string): Promise<Buffer | null> {
-    // DEMO: sustituye esto por tu lógica real
-    // const { fileUrl } = await this.mondayService.getFileUrlFromItem(id);
-    const fileUrl = process.env.DEMO_PDF_URL; // solo para probar
+  async fetchPdfBufferById(itemId: string): Promise<Buffer | null> {
+    // Atajo para pruebas locales
+    if (itemId === 'demo') {
+      const { readFile } = await import('fs/promises');
+      const { join } = await import('path');
+      return readFile(join(process.cwd(), 'test', 'dummy.pdf')).catch(() => null);
+    }
 
-    if (!fileUrl) return null;
+    const meta = await this.monday.getItemMeta(itemId);
+    if (!meta) {
+      this.logger.warn(`Item ${itemId} no encontrado`);
+      return null;
+    }
+    if (!meta.fileUrl) {
+      this.logger.warn(`Item ${itemId} sin fileUrl`);
+      return null;
+    }
 
-    const resp = await this.http.axiosRef.get(fileUrl, {
-      responseType: 'arraybuffer',
-      headers: fileUrl.includes('monday.com/protected_static')
-        ? { Authorization: process.env.MONDAY_TOKEN! }
-        : {},
-    });
-
-    return Buffer.from(resp.data);
+    try {
+      return await this.monday.downloadFile(meta.fileUrl);
+    } catch (e: any) {
+      this.logger.error(`Error bajando PDF: ${e?.message}`);
+      return null;
+    }
   }
 }
